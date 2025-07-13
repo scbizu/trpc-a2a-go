@@ -329,7 +329,7 @@ func (s *A2AServer) handleTasksSend(ctx context.Context, w http.ResponseWriter, 
 		s.writeJSONRPCError(w, request.ID, jsonrpc.ErrInvalidParams("task ID is required"))
 		return
 	}
-	if params.Message.Role == "" || len(params.Message.Parts) == 0 {
+	if params.Message.Role == protocol.MessageRoleUnknown || len(params.Message.Parts) == 0 {
 		s.writeJSONRPCError(w, request.ID, jsonrpc.ErrInvalidParams("message with at least one part is required"))
 		return
 	}
@@ -410,7 +410,7 @@ func (s *A2AServer) handleTasksSendSubscribe(ctx context.Context, w http.Respons
 		s.writeJSONRPCError(w, request.ID, jsonrpc.ErrInvalidParams("task ID is required"))
 		return
 	}
-	if params.Message.Role == "" || len(params.Message.Parts) == 0 {
+	if params.Message.Role == protocol.MessageRoleUnknown || len(params.Message.Parts) == 0 {
 		s.writeJSONRPCError(w, request.ID, jsonrpc.ErrInvalidParams("message with at least one part is required"))
 		return
 	}
@@ -685,7 +685,7 @@ func (s *A2AServer) handleMessageStream(ctx context.Context, w http.ResponseWrit
 		return
 	}
 
-	if params.Message.Role == "" || len(params.Message.Parts) == 0 {
+	if params.Message.Role == protocol.MessageRoleUnknown || len(params.Message.Parts) == 0 {
 		s.writeJSONRPCError(w, request.ID, jsonrpc.ErrInvalidParams("message with at least one part is required"))
 		return
 	}

@@ -1,0 +1,3 @@
+[submodule "protocol/spec"]
+	path = protocol/spec
+	url = git@github.com:a2aproject/A2A.git
