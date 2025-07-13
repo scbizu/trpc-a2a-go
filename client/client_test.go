@@ -21,6 +21,7 @@ import (
 
 	"trpc.group/trpc-go/trpc-a2a-go/internal/jsonrpc"
 	"trpc.group/trpc-go/trpc-a2a-go/protocol"
+	v1 "trpc.group/trpc-go/trpc-a2a-go/protocol/src/a2a-spec/google.golang.org/a2a/v1"
 )
 
 // TestA2AClient_SendTask tests the SendTask client method covering success,
@@ -31,8 +32,14 @@ func TestA2AClient_SendTask(t *testing.T) {
 		RPCID: taskID,
 		ID:    taskID,
 		Message: protocol.Message{
-			Role:  protocol.MessageRoleUser,
-			Parts: []protocol.Part{protocol.NewTextPart("Client test input")},
+			Message: &v1.Message{
+				Role: protocol.MessageRoleUser,
+				Content: []*protocol.Part{{
+					Part: &v1.Part_Text{
+						Text: "Client test input",
+					},
+				}},
+			},
 		},
 	}
 	paramsBytes, err := json.Marshal(params)
@@ -47,8 +54,10 @@ func TestA2AClient_SendTask(t *testing.T) {
 	t.Run("SendTask Success", func(t *testing.T) {
 		// Prepare mock server success response.
 		respTask := protocol.Task{
-			ID:     taskID,
-			Status: protocol.TaskStatus{State: protocol.TaskStateSubmitted},
+			Task: &v1.Task{
+				Id:     taskID,
+				Status: &protocol.TaskStatus{State: protocol.TaskStateSubmitted},
+			},
 		}
 		respResultBytes, err := json.Marshal(respTask)
 		require.NoError(t, err)
@@ -75,7 +84,7 @@ func TestA2AClient_SendTask(t *testing.T) {
 		require.NoError(t, err, "SendTask should not return an error on success")
 		require.NotNil(t, result, "Result should not be nil on success")
 
-		assert.Equal(t, taskID, result.ID)
+		assert.Equal(t, taskID, result.Id)
 		assert.Equal(t, protocol.TaskStateSubmitted, result.Status.State)
 	})
 
@@ -111,8 +120,12 @@ func TestA2AClient_StreamTask(t *testing.T) {
 		RPCID:     taskID,
 		SessionID: &taskID,
 		Message: protocol.Message{
-			Role:  protocol.MessageRoleUser,
-			Parts: []protocol.Part{protocol.NewTextPart("Client SSE test")},
+			Message: &v1.Message{
+				Role: protocol.MessageRoleUser,
+				Content: []*protocol.Part{
+					{Part: &v1.Part_Text{Text: "Client SSE test"}},
+				},
+			},
 		},
 	}
 	paramsBytes, err := json.Marshal(params)
@@ -127,18 +140,29 @@ func TestA2AClient_StreamTask(t *testing.T) {
 	t.Run("StreamTask Success", func(t *testing.T) {
 		// Prepare mock SSE stream data.
 		sseEvent1Data, _ := json.Marshal(protocol.TaskStatusUpdateEvent{
-			TaskID: taskID,
-			Status: protocol.TaskStatus{State: protocol.TaskStateWorking},
-			Final:  false,
+			TaskStatusUpdateEvent: &v1.TaskStatusUpdateEvent{
+				TaskId: taskID,
+				Status: &protocol.TaskStatus{State: protocol.TaskStateWorking},
+				Final:  false,
+			},
 		})
+		txt := protocol.NewTextPart("SSE data")
 		sseEvent2Data, _ := json.Marshal(protocol.TaskArtifactUpdateEvent{
-			TaskID:   taskID,
-			Artifact: protocol.Artifact{ArtifactID: "0", Parts: []protocol.Part{protocol.NewTextPart("SSE data")}},
+			TaskArtifactUpdateEvent: &v1.TaskArtifactUpdateEvent{
+				TaskId: taskID,
+				Artifact: &v1.Artifact{ArtifactId: "0", Parts: []*protocol.Part{
+					{
+						Part: &txt,
+					},
+				}},
+			},
 		})
 		sseEvent3Data, _ := json.Marshal(protocol.TaskStatusUpdateEvent{
-			TaskID: taskID,
-			Status: protocol.TaskStatus{State: protocol.TaskStateCompleted},
-			Final:  true,
+			TaskStatusUpdateEvent: &v1.TaskStatusUpdateEvent{
+				TaskId: taskID,
+				Status: &protocol.TaskStatus{State: protocol.TaskStateCompleted},
+				Final:  true,
+			},
 		})
 
 		// Format the mock SSE stream string.
@@ -266,13 +290,20 @@ func TestA2AClient_GetTasks(t *testing.T) {
 
 	t.Run("GetTasks Success", func(t *testing.T) {
 		// Prepare mock server response
+		txt := protocol.NewTextPart("Test result")
 		respTask := protocol.Task{
-			ID:     taskID,
-			Status: protocol.TaskStatus{State: protocol.TaskStateCompleted},
-			Artifacts: []protocol.Artifact{
-				{
-					Name:  stringPtr("test-artifact"),
-					Parts: []protocol.Part{protocol.NewTextPart("Test result")},
+			Task: &v1.Task{
+				Id:     taskID,
+				Status: &protocol.TaskStatus{State: protocol.TaskStateCompleted},
+				Artifacts: []*v1.Artifact{
+					{
+						Name: "test-artifact",
+						Parts: []*protocol.Part{
+							{
+								Part: &txt,
+							},
+						},
+					},
 				},
 			},
 		}
@@ -301,10 +332,10 @@ func TestA2AClient_GetTasks(t *testing.T) {
 		require.NoError(t, err, "GetTasks should not return an error on success")
 		require.NotNil(t, result, "Result should not be nil on success")
 
-		assert.Equal(t, taskID, result.ID)
+		assert.Equal(t, taskID, result.Id)
 		assert.Equal(t, protocol.TaskStateCompleted, result.Status.State)
 		assert.Len(t, result.Artifacts, 1)
-		assert.Equal(t, "test-artifact", *result.Artifacts[0].Name)
+		assert.Equal(t, "test-artifact", result.Artifacts[0].Name)
 	})
 
 	t.Run("GetTasks JSON-RPC Error", func(t *testing.T) {
@@ -362,8 +393,10 @@ func TestA2AClient_CancelTasks(t *testing.T) {
 	t.Run("CancelTasks Success", func(t *testing.T) {
 		// Prepare mock server response
 		respTask := protocol.Task{
-			ID:     taskID,
-			Status: protocol.TaskStatus{State: protocol.TaskStateCanceled},
+			Task: &v1.Task{
+				Id:     taskID,
+				Status: &v1.TaskStatus{State: protocol.TaskStateCanceled},
+			},
 		}
 		respResultBytes, err := json.Marshal(respTask)
 		require.NoError(t, err)
@@ -390,7 +423,7 @@ func TestA2AClient_CancelTasks(t *testing.T) {
 		require.NoError(t, err, "CancelTasks should not return an error on success")
 		require.NotNil(t, result, "Result should not be nil on success")
 
-		assert.Equal(t, taskID, result.ID)
+		assert.Equal(t, taskID, result.Id)
 		assert.Equal(t, protocol.TaskStateCanceled, result.Status.State)
 	})
 
@@ -433,13 +466,15 @@ func TestA2AClient_CancelTasks(t *testing.T) {
 // TestA2AClient_SetPushNotification tests the SetPushNotification client method.
 func TestA2AClient_SetPushNotification(t *testing.T) {
 	taskID := "client-push-task-1"
-	params := protocol.TaskPushNotificationConfig{
-		RPCID:  taskID,
-		TaskID: taskID,
-		PushNotificationConfig: protocol.PushNotificationConfig{
-			URL: "https://example.com/webhook",
-			Authentication: &protocol.AuthenticationInfo{
-				Schemes: []string{"bearer"},
+	params := &protocol.TaskPushNotificationConfig{
+		ConfigID: taskID,
+		TaskID:   taskID,
+		TaskPushNotificationConfig: &v1.TaskPushNotificationConfig{
+			PushNotificationConfig: &v1.PushNotificationConfig{
+				Url: "https://example.com/webhook",
+				Authentication: &v1.AuthenticationInfo{
+					Schemes: []string{"bearer"},
+				},
 			},
 		},
 	}
@@ -456,8 +491,10 @@ func TestA2AClient_SetPushNotification(t *testing.T) {
 		// Prepare mock server response
 		respConfig := protocol.TaskPushNotificationConfig{
 			TaskID: taskID,
-			PushNotificationConfig: protocol.PushNotificationConfig{
-				URL: "https://example.com/webhook",
+			TaskPushNotificationConfig: &v1.TaskPushNotificationConfig{
+				PushNotificationConfig: &v1.PushNotificationConfig{
+					Url: "https://example.com/webhook",
+				},
 			},
 		}
 		respResultBytes, err := json.Marshal(respConfig)
@@ -486,7 +523,7 @@ func TestA2AClient_SetPushNotification(t *testing.T) {
 		require.NotNil(t, result, "Result should not be nil on success")
 
 		assert.Equal(t, taskID, result.TaskID)
-		assert.Equal(t, "https://example.com/webhook", result.PushNotificationConfig.URL)
+		assert.Equal(t, "https://example.com/webhook", result.PushNotificationConfig.Url)
 	})
 
 	t.Run("SetPushNotification Invalid URL", func(t *testing.T) {
@@ -544,10 +581,12 @@ func TestA2AClient_GetPushNotification(t *testing.T) {
 	t.Run("GetPushNotification Success", func(t *testing.T) {
 		respConfig := protocol.TaskPushNotificationConfig{
 			TaskID: taskID,
-			PushNotificationConfig: protocol.PushNotificationConfig{
-				URL: "https://example.com/webhook",
-				Authentication: &protocol.AuthenticationInfo{
-					Schemes: []string{"bearer"},
+			TaskPushNotificationConfig: &v1.TaskPushNotificationConfig{
+				PushNotificationConfig: &v1.PushNotificationConfig{
+					Url: "https://example.com/webhook",
+					Authentication: &v1.AuthenticationInfo{
+						Schemes: []string{"bearer"},
+					},
 				},
 			},
 		}
@@ -576,8 +615,7 @@ func TestA2AClient_GetPushNotification(t *testing.T) {
 		require.NoError(t, err, "GetPushNotification should not return an error on success")
 		require.NotNil(t, result, "Result should not be nil on success")
 
-		assert.Equal(t, taskID, result.TaskID)
-		assert.Equal(t, "https://example.com/webhook", result.PushNotificationConfig.URL)
+		assert.Equal(t, "https://example.com/webhook", result.PushNotificationConfig.Url)
 		require.NotNil(t, result.PushNotificationConfig.Authentication)
 		assert.Contains(t, result.PushNotificationConfig.Authentication.Schemes, "bearer")
 	})
